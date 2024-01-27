@@ -1,0 +1,39 @@
+import * as THREE from "three";
+
+export default class Sketch {
+  constructor(options) {
+    this.container = options.domElement;
+    this.width = options.domElement.offsetWidth;
+    this.height = options.domElement.offsetHeight;
+    this.camera = new THREE.PerspectiveCamera(70, this.width / this.height, 0.01, 10);
+    this.camera.position.z = 1;
+
+    this.scene = new THREE.Scene();
+
+    this.renderer = new THREE.WebGLRenderer({ antialias: true });
+    this.renderer.setSize(this.width, this.height);
+    this.container.appendChild(this.renderer.domElement);
+
+    this.time = 0;
+    this.addObjects();
+    this.render();
+  }
+
+  addObjects() {
+    this.geometry = new THREE.BoxGeometry(0.2, 0.2, 0.2);
+    this.material = new THREE.MeshNormalMaterial();
+
+    this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.scene.add(this.mesh);
+  }
+
+  render() {
+    this.time += 0.05;
+    this.renderer.render(this.scene, this.camera)
+    requestAnimationFrame(this.render.bind(this));
+  }
+}
+
+new Sketch({
+    domElement: document.getElementById("container")
+});
