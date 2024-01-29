@@ -39033,8 +39033,14 @@ var OrbitControls = /*#__PURE__*/function (_EventDispatcher) {
   return _createClass(OrbitControls);
 }(_three.EventDispatcher);
 exports.OrbitControls = OrbitControls;
-},{"three":"node_modules/three/build/three.module.js"}],"brush.png":[function(require,module,exports) {
+},{"three":"node_modules/three/build/three.module.js"}],"js/shader/fragment.glsl":[function(require,module,exports) {
+module.exports = "#define GLSLIFY 1\nuniform float time;\nuniform sampler2D uTexture;\nuniform sampler2D uDisplacement;\nuniform vec4 resolution;\nvarying vec2 vUv;\nvarying vec3 vPosition;\nfloat PI = 3.1415926535897932384626433832795;\n\nvoid main(){\n    vec4 displacement = texture2D(uDisplacement, vUv);\n    float theta = displacement.r*2.*PI;\n\n    vec2 dir = vec2(sin(theta), cos(theta));\n\n    vec2 uv = vUv + dir*displacement.r*0.1;\n\n    vec4 color = texture2D(uTexture, uv);\n    gl_FragColor = color;\n}";
+},{}],"js/shader/vertex.glsl":[function(require,module,exports) {
+module.exports = "#define GLSLIFY 1\nvarying vec2 vUv;\nvarying vec3 vPosition;\n\nvoid main() {\n    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);\n\n    vUv = uv;\n    vPosition = position;\n}\n";
+},{}],"brush.png":[function(require,module,exports) {
 module.exports = "/brush.6cb86270.png";
+},{}],"girl.jpg":[function(require,module,exports) {
+module.exports = "/girl.001699a2.jpg";
 },{}],"js/app.js":[function(require,module,exports) {
 "use strict";
 
@@ -39044,7 +39050,10 @@ Object.defineProperty(exports, "__esModule", {
 exports.default = void 0;
 var THREE = _interopRequireWildcard(require("three"));
 var _OrbitControls = require("three/examples/jsm/controls/OrbitControls");
+var _fragment = _interopRequireDefault(require("./shader/fragment.glsl"));
+var _vertex = _interopRequireDefault(require("./shader/vertex.glsl"));
 var _brush = _interopRequireDefault(require("../brush.png"));
+var _girl = _interopRequireDefault(require("../girl.jpg"));
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
 function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
@@ -39058,6 +39067,7 @@ var Sketch = /*#__PURE__*/function () {
   function Sketch(options) {
     _classCallCheck(this, Sketch);
     this.scene = new THREE.Scene();
+    this.scene1 = new THREE.Scene();
     this.container = options.domElement;
     this.width = options.domElement.offsetWidth;
     this.height = options.domElement.offsetHeight;
@@ -39066,11 +39076,18 @@ var Sketch = /*#__PURE__*/function () {
     var aspect = this.width / this.height;
     this.camera = new THREE.OrthographicCamera(frustumSize * aspect / -2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / -2, -1000, 1000);
     this.camera.position.z = 1;
+    this.baseTexture = new THREE.WebGLRenderTarget(this.width, this.height, {
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      format: THREE.RGBAFormat
+    });
     this.renderer = new THREE.WebGLRenderer({
       antialias: true
     });
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.setSize(this.width, this.height);
-    this.control = new _OrbitControls.OrbitControls(this.camera, this.renderer.domElement);
+
+    // this.control = new OrbitControls(this.camera, this.renderer.domElement)
     this.container.appendChild(this.renderer.domElement);
     this.time = 0;
     this.mouse = new THREE.Vector2(0, 0);
@@ -39078,9 +39095,40 @@ var Sketch = /*#__PURE__*/function () {
     this.currentWave = 0;
     this.mouseEvents();
     this.addObjects();
+    this.resize();
     this.render();
   }
   _createClass(Sketch, [{
+    key: "setupResize",
+    value: function setupResize() {
+      window.addEventListener("resize", this.resize.bind(this));
+    }
+  }, {
+    key: "resize",
+    value: function resize() {
+      this.width = this.container.offsetWidth;
+      this.height = this.container.offsetHeight;
+      this.renderer.setSize(this.width, this.height);
+      this.camera.aspect = this.width / this.height;
+
+      // image cover
+      this.imageAspect = 853 / 1280;
+      var a1;
+      var a2;
+      if (this.height / this.width > this.imageAspect) {
+        a1 = this.width / this.height * this.imageAspect;
+        a2 = 1;
+      } else {
+        a1 = 1;
+        a2 = this.height / this.width / this.imageAspect;
+      }
+      this.material.uniforms.resolution.value.x = this.width;
+      this.material.uniforms.resolution.value.y = this.height;
+      this.material.uniforms.resolution.value.z = a1;
+      this.material.uniforms.resolution.value.w = a2;
+      this.camera.updateProjectionMatrix();
+    }
+  }, {
     key: "mouseEvents",
     value: function mouseEvents() {
       var _this = this;
@@ -39092,10 +39140,27 @@ var Sketch = /*#__PURE__*/function () {
   }, {
     key: "addObjects",
     value: function addObjects() {
-      this.geometry = new THREE.PlaneGeometry(40, 40, 1, 1);
-
-      // this.material = new THREE.MeshNormalMaterial();
-
+      this.material = new THREE.ShaderMaterial({
+        side: THREE.DoubleSide,
+        uniforms: {
+          time: {
+            value: 0
+          },
+          uDisplacement: {
+            value: null
+          },
+          uTexture: {
+            value: new THREE.TextureLoader().load(_girl.default)
+          },
+          resolution: {
+            value: new THREE.Vector4()
+          }
+        },
+        vertexShader: _vertex.default,
+        fragmentShader: _fragment.default
+      });
+      this.geometry = new THREE.PlaneGeometry(64, 64, 1, 1);
+      this.geometryFullScreen = new THREE.PlaneGeometry(this.width + this.width / 3, this.height + this.height / 3, 1, 1);
       this.max = 50;
       this.meshes = [];
       for (var i = 0; i < this.max; i++) {
@@ -39112,9 +39177,8 @@ var Sketch = /*#__PURE__*/function () {
         this.scene.add(mesh);
         this.meshes.push(mesh);
       }
-
-      // this.mesh = new THREE.Mesh(this.geometry, this.material);
-      // this.scene.add(this.mesh);
+      this.quad = new THREE.Mesh(this.geometryFullScreen, this.material);
+      this.scene1.add(this.quad);
     }
   }, {
     key: "setNewWave",
@@ -39123,8 +39187,8 @@ var Sketch = /*#__PURE__*/function () {
       mesh.visible = true;
       mesh.position.x = x;
       mesh.position.y = y;
-      mesh.scale.x = mesh.scale.y = 1;
-      mesh.material.opacity = 1;
+      mesh.scale.x = mesh.scale.y = 0.2;
+      mesh.material.opacity = 0.5;
     }
   }, {
     key: "trackMousePos",
@@ -39144,16 +39208,21 @@ var Sketch = /*#__PURE__*/function () {
       this.trackMousePos();
       this.time += 0.05;
       requestAnimationFrame(this.render.bind(this));
+      this.renderer.setRenderTarget(this.baseTexture);
       this.renderer.render(this.scene, this.camera);
+      this.material.uniforms.uDisplacement.value = this.baseTexture.texture;
+      this.renderer.setRenderTarget(null);
+      this.renderer.clear();
+      this.renderer.render(this.scene1, this.camera);
       this.meshes.forEach(function (mesh) {
         if (mesh.visible) {
           // mesh.position.x = this.mouse.x;
           // mesh.position.y = this.mouse.y;
           mesh.rotation.z += 0.02;
-          mesh.material.opacity *= 0.98;
-          mesh.scale.x = 0.98 * mesh.scale.x + 0.1;
+          mesh.material.opacity *= 0.96;
+          mesh.scale.x = 0.982 * mesh.scale.x + 0.108;
           mesh.scale.y = mesh.scale.x;
-          if (mesh.material.opacity < 0.02) {
+          if (mesh.material.opacity < 0.002) {
             mesh.visible = false;
           }
         }
@@ -39166,188 +39235,7 @@ exports.default = Sketch;
 new Sketch({
   domElement: document.getElementById("container")
 });
-
-// import * as THREE from "three";
-// import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
-// import * as dat from "dat.gui";
-// import gsap from "gsap";
-
-// import brush from "../brush.png";
-
-// export default class Sketch {
-//   constructor(options) {
-//     this.scene = new THREE.Scene();
-
-//     this.container = options.domElement;
-//     this.width = this.container.offsetWidth;
-//     this.height = this.container.offsetHeight;
-//     this.renderer = new THREE.WebGLRenderer({ antialias: true });
-//     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-//     this.renderer.setSize(this.width, this.height);
-//     this.renderer.setClearColor(0x000000, 1);
-//     this.renderer.physicallyCorrectLights = true;
-//     this.renderer.outputEncoding = THREE.sRGBEncoding;
-
-//     this.container.appendChild(this.renderer.domElement);
-
-//     this.camera = new THREE.PerspectiveCamera(
-//       70,
-//       this.width/this.height,
-//       0.001,
-//       1000
-//     )
-
-//     var frustumSize = this.height;
-//     var aspect = this.width/this.height;
-//     this.camera = new THREE.OrthographicCamera(frustumSize * aspect / - 2, frustumSize * aspect / 2, frustumSize / 2, frustumSize / - 2, -1000, 1000);
-//     this.camera.position.set(0, 0, 2);
-//     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-//     // this.controls.enableDamping = true;
-//     this.time = 0;
-//     this.mouse = new THREE.Vector2(0, 0);
-//     this.prevMouse = new THREE.Vector2(0, 0);
-//     this.currentWave = 0;
-
-//     this.isPlaying = true;
-//     this.mouseEvents();
-//     this.addObjects();
-//     this.resize();
-//     this.render();
-//     this.setupResize();
-//     // this.settings()
-//   }
-
-//   settings() {
-//     let that = this;
-//     this.settings = {
-//       progress: 0,
-//     };
-//     this.gui = new dat.GUI();
-//     this.gui.add(this.settings, "progress", 0, 1, 0.01);
-//   }
-
-//   setupResize() {
-//     window.addEventListener("resize", this.resize.bind(this));
-//   }
-
-//   resize() {
-//     this.width = this.container.offsetWidth;
-//     this.height = this.container.offsetHeight;
-//     this.renderer.setSize(this.width, this.height);
-//     this.camera.aspect = this.width / this.height;
-
-//     // image cover
-//     // this.imageAspect = 853/1280;
-//     // let a1; let a2;
-//     // if(this.height/this.width>this.imageAspect){
-//     //   a1 = (this.width/this.height) * this.imageAspect;
-//     //   a2 = 1;
-//     // } else {
-//     //   a1 = 1;
-//     //   a2 = (this.height/this.width) / this.imageAspect;
-//     // }
-
-//     // this.material.uniforms.resolution.value.x = this.width;
-//     // this.material.uniforms.resolution.value.y = this.height;
-//     // this.material.uniforms.resolution.value.z = a1;
-//     // this.material.uniforms.resolution.value.w = a2;
-
-//     this.camera.updateProjectionMatrix();
-//   }
-
-//   mouseEvents() {
-//     window.addEventListener("mousemove", (e) => {
-//       this.mouse.x = e.clientX - this.width / 2;
-//       this.mouse.y = this.height/ 2 - e.clientY;
-//     })
-//   }
-
-//   addObjects() {
-//     let that = this;
-//     this.material = new THREE.ShaderMaterial({});
-
-//     this.max = 2;
-
-//     this.geometry = new THREE.PlaneGeometry(100, 100, 1, 1);
-//     this.meshes = [];
-
-//     // this.material1 = new THREE.MeshBasicMaterial({
-//     //   color: 0xff0000,
-//     //   map: new THREE.TextureLoader().load(brush),
-//     // });
-
-//     for (let i = 0; i < this.max; i++) {
-//       let m = new THREE.MeshBasicMaterial({
-//         map: new THREE.TextureLoader().load(brush),
-//         transparent: true,
-//         blending: THREE.AdditiveBlending,
-//         depthTest: false,
-//         depthWrite: false
-//       });
-
-//       let mesh = new THREE.Mesh(this.geometry, m);
-
-//       // mesh.visible = false;
-//       mesh.rotation.z = 2 * Math.PI * Math.random();
-//       this.scene.add(mesh);
-//       this.meshes.push(mesh);
-//     }
-
-//     // this.mesh = new THREE.Mesh(this.geometry, this.material1);
-//     // this.scene.add(this.mesh);
-//   }
-
-//   stop() {
-//     this.isPlaying = false;
-//   }
-
-//   play() {
-//     if (!this.isPlaying) {
-//       this.isPlaying = true;
-//       this.render();
-//     }
-//   }
-
-//   setNewWave(x,y,index) {
-//     let mesh  = this.meshes[index];
-//     mesh.visible = true;
-//     mesh.position.x = x;
-//     mesh.position.y = y;
-//   }
-
-//   trackMousePos() {
-//     if(Math.abs(this.mouse.x - this.prevMouse.x)<4 && 
-//     Math.abs(this.mouse.y - this.prevMouse.y)<4){
-//       // Nothing
-//     } else {
-//       this.setNewWave(this.mouse.x, this.mouse.y, this.currentWave)
-//       this.currentWave = (this.currentWave+1)%this.max;
-//       console.log(this.currentWave);
-//     }
-
-//     this.prevMouse.x = this.mouse.x;
-//     this.prevMouse.y = this.mouse.y;
-//   }
-
-//   render() {
-//     this.trackMousePos()
-//     if (!this.isPlaying) return;
-//     this.time += 0.05;
-//     // this.controls.update();
-//     requestAnimationFrame(this.render.bind(this));
-//     this.renderer.render(this.scene, this.camera);
-
-//     this.meshes.forEach(mesh => {
-//       // mesh.position.x = this.mouse.x;
-//       // mesh.position.y = this.mouse.y;
-//     })
-//   }
-// }
-
-// new Sketch({
-//   domElement: document.getElementById("container"),
-// });
-},{"three":"node_modules/three/build/three.module.js","three/examples/jsm/controls/OrbitControls":"node_modules/three/examples/jsm/controls/OrbitControls.js","../brush.png":"brush.png"}],"../../../AppData/Roaming/npm/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+},{"three":"node_modules/three/build/three.module.js","three/examples/jsm/controls/OrbitControls":"node_modules/three/examples/jsm/controls/OrbitControls.js","./shader/fragment.glsl":"js/shader/fragment.glsl","./shader/vertex.glsl":"js/shader/vertex.glsl","../brush.png":"brush.png","../girl.jpg":"girl.jpg"}],"../../../AppData/Roaming/npm/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -39372,7 +39260,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "59609" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "60729" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
